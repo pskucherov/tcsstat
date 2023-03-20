@@ -7,11 +7,16 @@ export default function Home() {
     const [socket, setSocket] = useState();
 
     const socketInitializer = useCallback(async () => {
-        await fetch('/api/socket');
+        await fetch('/api/investapi');
         const socket = sIo();
 
         socket.on('connect', () => {
             console.log('connected'); // eslint-disable-line no-console
+            socket.emit('sdk:getAccountId');
+        });
+
+        socket.on('sdk:getAccountIdResult', data => {
+            console.log('sdk:getAccountIdResult', data); // eslint-disable-line no-console
         });
 
         setSocket(socket);
