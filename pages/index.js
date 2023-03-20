@@ -6,20 +6,20 @@ import io from 'Socket.IO-client'
 export default function Home() {
   const [socket, setSocket] = useState();
 
-  // const socketInitializer = useCallback(async () => {
-  //   await fetch('/api/socket')
-  //   const socket = io()
+  const socketInitializer = useCallback(async () => {
+    await fetch('/api/socket')
+    const socket = io()
 
-  //   socket.on('connect', () => {
-  //     console.log('connected');
-  //   })
+    socket.on('connect', () => {
+      console.log('connected');
+    })
 
-  //   setSocket(socket);
-  // }, [setSocket]);
+    setSocket(socket);
+  }, [setSocket]);
 
-  // useEffect(() => {
-  //   socketInitializer()
-  // }, [socketInitializer]);
+  useEffect(() => {
+    socketInitializer()
+  }, [socketInitializer]);
 
   return (
     <>
