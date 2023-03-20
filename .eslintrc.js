@@ -20,12 +20,9 @@ module.exports = {
     },
     extends: [
         'prettier',
-        'plugin:import/errors',
-        'plugin:import/warnings',
         'plugin:sonarjs/recommended',
         'plugin:promise/recommended',
         'next/core-web-vitals',
-
     ],
     plugins: [
         'optimize-regex',

@@ -1,10 +1,12 @@
 import Head from 'next/head';
-import styles from '../styles/Home.module.css';
+import styles from '@/styles/Home.module.css';
 import { useCallback, useEffect, useState } from 'react';
 import sIo from 'socket.io-client';
+import SelectAccount from '@/components/SelectAccount/SelectAccount';
 
 export default function Home() {
-    const [socket, setSocket] = useState();
+    const [accounts, setAccounts] = useState();
+    const [accountId, setAccountId] = useState();
 
     const socketInitializer = useCallback(async () => {
         await fetch('/api/investapi');
@@ -17,10 +19,9 @@ export default function Home() {
 
         socket.on('sdk:getAccountIdResult', data => {
             console.log('sdk:getAccountIdResult', data); // eslint-disable-line no-console
+            setAccounts(data);
         });
-
-        setSocket(socket);
-    }, [setSocket]);
+    }, [setAccounts]);
 
     useEffect(() => {
         socketInitializer();
@@ -35,7 +36,11 @@ export default function Home() {
                 <link rel="icon" href="/favicon.ico" />
             </Head>
             <main className={styles.main}>
-
+                {Boolean(accounts?.length) && <SelectAccount
+                    accounts={accounts}
+                    selectedId={accountId}
+                    onSelect={id => setAccountId(id)}
+                />}
             </main>
         </>
     );
