@@ -17,6 +17,10 @@ export default function Home() {
             socket.emit('sdk:getAccountId');
         });
 
+        socket.on('error', e => {
+            e && console.log(e); // eslint-disable-line no-console
+        });
+
         socket.on('sdk:getAccountIdResult', data => {
             console.log('sdk:getAccountIdResult', data); // eslint-disable-line no-console
             setAccounts(data);

@@ -1,9 +1,9 @@
 import { Server } from 'socket.io';
 import { createSdk } from 'tinkoff-sdk-grpc-js';
 
-// Токен, который можно получить вот так:
+// Здесь нужно задать Токен, который можно получить вот так:
 // https://articles.opexflow.com/trading-training/kak-poluchit-token-dlya-tinkoff-investicii.htm
-const TOKEN = 't.YOURTOKEN';
+const TOKEN = '';
 
 // Имя приложения, по которому вас смогут найти в логах ТКС.
 const appName = 'tcsstat';
@@ -12,12 +12,17 @@ const appName = 'tcsstat';
  * Метод логирования, который передаётся в sdk для обработки ошибок.
  */
 const sdkLogger = (meta, error, descr) => {
-    console.log(meta, error, descr); // eslint-disable-line no-console
+    console.log(meta || '', error || '', descr || ''); // eslint-disable-line no-console
 
     // No connection established
     if (Number(error?.code) === 14) {
         throw new Error(error);
     }
+};
+
+const socketLogger = (socket, error) => {
+    socket?.emit('error', error);
+    sdkLogger(error);
 };
 
 const sdk = createSdk(TOKEN, appName, sdkLogger);
@@ -42,13 +47,19 @@ const InvestApiHandler = (req, res) => {
             res.socket.server.io = io;
 
             io.on('connection', socket => {
+                if (!TOKEN) {
+                    socketLogger(socket, 'Укажите токен TOKEN в pages/api/investapi.js:6');
+
+                    return;
+                }
+
                 socket.on('sdk:getAccountId', async () => {
                     try {
                         const { accounts } = await getAccounts(sdk);
 
                         socket.emit('sdk:getAccountIdResult', accounts || []);
                     } catch (e) {
-                        sdkLogger(e);
+                        socketLogger(socket, e);
                     }
                 });
             });
