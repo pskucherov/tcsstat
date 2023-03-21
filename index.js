@@ -7,20 +7,6 @@ const appName = 'tcsstat';
 
 const sdk = createSdk(TOKEN, appName);
 
-// Получаем дату вычетая дни от текущей.
-const getDateSubDay = (subDay = 5, start = true) => {
-	const date = new Date();
-	date.setUTCDate(date.getUTCDate() - subDay);
-
-	if (start) {
-		date.setUTCHours(0, 0, 0, 0);
-	} else {
-		date.setUTCHours(23, 59, 59, 999);
-	}
-
-	return date;
-};
-
 const printBrokerReport = report => {
 	console.log(JSON.stringify(report, null, 4));
 };
@@ -29,22 +15,25 @@ const timer = async time => {
 	return new Promise(resolve => setTimeout(resolve, time));
 }
 
-// Получаем отчёт по taskId с ожиданием отчёта.
-// Если в коде будет ошибка не про ожидание отчёта,
-// то он всё равно будет повторять запрос.
-const getBrokerResponseByTaskId = async (taskId, page = 0) => {
+const getOperationsByCursor = async (sdk, accountId, from, to, cursor = '') => {
 	try {
-        return await (sdk.operations.getBrokerReport)({
-            getBrokerReportRequest: {
-                taskId,
-                page,
-            },
-        });
-    } catch (e) {
-		console.log('wait', e);
-		await timer(10000);
-		return await getBrokerResponseByTaskId(taskId, page);
-    }
+		const reqData = {
+			accountId,
+			from,
+			to,
+			limit: 1000,
+			state: sdk.OperationState.OPERATION_STATE_EXECUTED,
+			withoutCommissions: false,
+			withoutTrades: false,
+			withoutOvernights: false,
+			cursor,
+		};
+
+		return await sdk.operations.getOperationsByCursor(reqData);
+	} catch (e) {
+		await timer(60000);
+		return await getOperationsByCursor(sdk, accountId, from, to, cursor = '');
+	}
 };
 
 (async () => {
@@ -56,37 +45,27 @@ const getBrokerResponseByTaskId = async (taskId, page = 0) => {
 	}
 
 	// Берём первый счёт из списка
-	const { id: accountId } = accounts.find(a => a.type === sdk.AccountType.ACCOUNT_TYPE_TINKOFF);
+	const {
+		id: accountId,
+		openedDate,
+		closedDate,
+	} = accounts.find(a => a.type === sdk.AccountType.ACCOUNT_TYPE_TINKOFF);
 
 	if (!accountId) {
 		console.log('Проверьте доступность счёта для API.');
 		return;
 	}
 
-	const from = getDateSubDay(12, true);
-	const to = getDateSubDay(5);
+	const from = new Date(openedDate);
+	const to = new Date(closedDate).getTime() ? closedDate : new Date();
+	let nextCursor = '';
 
-	console.log('accountId', accountId);
-	console.log('from', from.toISOString());
-	console.log('to', to.toISOString());
+	do {
+		const data = await getOperationsByCursor(sdk, accountId, from, to, nextCursor);
+		nextCursor = data?.nextCursor;
 
-	const brokerReport = await (sdk.operations.getBrokerReport)({
-		generateBrokerReportRequest: {
-			accountId,
-			from,
-			to,
-		},
-	});
-
-	if (brokerReport?.getBrokerReportResponse?.brokerReport) {
-		console.log('Отчёт уже сформирован');
-		printBrokerReport(brokerReport?.getBrokerReportResponse?.brokerReport);
-		return;
-	}
-
-	if (brokerReport?.generateBrokerReportResponse?.taskId) {
-		console.log('Ждём отчёт');
-		const report = await getBrokerResponseByTaskId(brokerReport?.generateBrokerReportResponse?.taskId);
-		printBrokerReport(report);
-	}
+		if (data?.items?.length) {
+			printBrokerReport(data);
+		}
+	} while(nextCursor)
 })();
