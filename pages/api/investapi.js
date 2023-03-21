@@ -21,7 +21,7 @@ const sdkLogger = (meta, error, descr) => {
 };
 
 const socketLogger = (socket, error) => {
-    socket?.emit('error', error);
+    socket?.emit('sdk:error', error);
     sdkLogger(error);
 };
 
@@ -37,6 +37,75 @@ const getAccounts = async sdk => {
     }
 };
 
+// Таймер приостанова, если вышел лимит на запросы.
+const timer = async time => {
+    return new Promise(resolve => setTimeout(resolve, time));
+};
+
+// Запрос выполненных операций.
+const getOperationsByCursor = async (accountId, from, to, cursor = '') => {
+    try {
+        const reqData = {
+            accountId,
+            from,
+            to,
+            limit: 1000,
+            state: sdk?.OperationState.OPERATION_STATE_EXECUTED,
+            operationTypes: [sdk?.OperationType.OPERATION_TYPE_BROKER_FEE],
+            withoutCommissions: false,
+            withoutTrades: false,
+            withoutOvernights: false,
+            cursor,
+        };
+
+        return await sdk?.operations?.getOperationsByCursor(reqData);
+    } catch (e) {
+        await timer(60000);
+
+        return await getOperationsByCursor(accountId, from, to, cursor = '');
+    }
+};
+
+let allAccounts;
+
+const getAccount = async socket => {
+    try {
+        const { accounts } = await getAccounts(sdk);
+
+        allAccounts = accounts;
+        socket.emit('sdk:getAccountIdResult', accounts || []);
+    } catch (e) {
+        socketLogger(socket, e);
+    }
+};
+
+const getOperationsCommission = async (socket, id) => {
+    try {
+        const {
+            id: accountId,
+            openedDate,
+            closedDate,
+        } = allAccounts.find(a => a.id === id);
+
+        const from = new Date(openedDate);
+        const to = new Date(closedDate).getTime() ? closedDate : new Date();
+        let nextCursor = '';
+
+        do {
+            const data = await getOperationsByCursor(accountId, from, to, nextCursor);
+
+            nextCursor = data?.nextCursor;
+
+            socket.emit('sdk:getOperationsCommissionResult_' + accountId, {
+                items: data?.items,
+                inProgress: Boolean(nextCursor),
+            });
+        } while (nextCursor);
+    } catch (e) {
+        socketLogger(socket, e);
+    }
+};
+
 // Создаёт socket.io сервер и обрабатывает запросы по работе с sdk.
 const InvestApiHandler = (req, res) => {
     try {
@@ -49,18 +118,12 @@ const InvestApiHandler = (req, res) => {
             io.on('connection', socket => {
                 if (!TOKEN) {
                     socketLogger(socket, 'Укажите токен TOKEN в pages/api/investapi.js:6');
+
                     return;
                 }
 
-                socket.on('sdk:getAccountId', async () => {
-                    try {
-                        const { accounts } = await getAccounts(sdk);
-
-                        socket.emit('sdk:getAccountIdResult', accounts || []);
-                    } catch (e) {
-                        socketLogger(socket, e);
-                    }
-                });
+                socket.on('sdk:getAccountId', getAccount.bind(this, socket));
+                socket.on('sdk:getOperationsCommission', getOperationsCommission.bind(this, socket));
             });
         }
     } catch (e) {

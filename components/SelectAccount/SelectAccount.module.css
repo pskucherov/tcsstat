@@ -5,6 +5,7 @@
   min-width: 350px;
   width: 50%;
   padding: 20px;
+  overflow: hidden;
 }
 
 .selectedAccount,
