@@ -23,20 +23,23 @@ const Account = props => {
             onSelect(account?.id);
         }}
     >
-        <div>{inProgress ? <Spinner color="warning" size="sm" /> : ''} {account.name} ({dataSize})</div>
+        <div><b>{inProgress ? <Spinner color="warning" size="sm" /> : ''} {account.name} ({dataSize})</b></div>
         {Object.keys(commissionData).length ?
-            <>
-                <div>Комиссия:</div>
-                {Object.keys(commissionData).map((name, k) => {
-                    const { units: u, nano: n } = commissionData[name];
 
-                    return <div
-                        key={k}
-                    >
-                        {u + n / 1e9} {name}
+            Object.keys(commissionData)
+                .map((currency, k) => {
+                    return <div key={k} >
+                        {Object.keys(commissionData[currency]).map((name, j) => {
+                            const { units: u, nano: n } = commissionData[currency][name];
+
+                            return <div
+                                key={j}
+                            >
+                                {name}: {u + n / 1e9} {currency}
+                            </div>;
+                        })}
                     </div>;
-                })}
-            </> :
+                }) :
             ''}
     </div>;
 };
