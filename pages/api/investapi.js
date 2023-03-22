@@ -62,7 +62,7 @@ const getOperationsByCursor = async (accountId, from, to, cursor = '') => {
     } catch (e) {
         await timer(60000);
 
-        return await getOperationsByCursor(accountId, from, to, cursor = '');
+        return await getOperationsByCursor(accountId, from, to, cursor);
     }
 };
 
@@ -79,28 +79,46 @@ const getAccount = async socket => {
     }
 };
 
-const getOperationsCommission = async (socket, id) => {
+const getOperationsCommission = async (socket, id, options) => {
     try {
+        if (!id) {
+            return;
+        }
+
         const {
             id: accountId,
             openedDate,
             closedDate,
-        } = allAccounts.find(a => a.id === id);
+        } = allAccounts?.find(a => a.id === id);
 
-        const from = new Date(openedDate);
-        const to = new Date(closedDate).getTime() ? closedDate : new Date();
-        let nextCursor = '';
+        if (!accountId) {
+            return;
+        }
 
-        do {
-            const data = await getOperationsByCursor(accountId, from, to, nextCursor);
+        let from;
+        let to;
 
-            nextCursor = data?.nextCursor;
+        if (options?.from) {
+            from = new Date(options?.from);
+        } else {
+            from = new Date(openedDate);
+        }
 
-            socket.emit('sdk:getOperationsCommissionResult_' + accountId, {
-                items: data?.items,
-                inProgress: Boolean(nextCursor),
-            });
-        } while (nextCursor);
+        if (options?.to) {
+            to = new Date(options?.to);
+        } else {
+            to = new Date(closedDate).getTime() ? new Date(closedDate) : new Date();
+        }
+
+        const data = await getOperationsByCursor(accountId, from, to, options?.cursor);
+        const nextCursor = data?.nextCursor;
+
+        socket.emit('sdk:getOperationsCommissionResult_' + accountId, {
+            items: data?.items,
+            nextCursor,
+            from,
+            to,
+        });
     } catch (e) {
         socketLogger(socket, e);
     }
